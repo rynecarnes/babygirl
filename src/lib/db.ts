@@ -10,15 +10,14 @@ import path from "path";
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
 
-const useLocalFs =
-  !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const useLocalFs = !supabaseUrl || !supabaseServiceKey;
 
 export const supabase = useLocalFs
   ? null
-  : createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+  : createClient(supabaseUrl!, supabaseServiceKey!);
 
 // ─── Local FS fallback (development) ──────────────────────
 type LocalDb = {
@@ -59,7 +58,7 @@ export async function getGuesses(): Promise<Guess[]> {
     submittedAt: row.submittedat,
     birthDatetime: row.birthdatetime,
     weightLbs: row.weightlbs,
-    weightOz: row.weightos,
+    weightOz: row.weightoz,
     heightIn: row.heightin,
   }));
 }
@@ -77,7 +76,7 @@ export async function appendGuess(guess: Guess): Promise<void> {
     submittedat: guess.submittedAt,
     birthdatetime: guess.birthDatetime,
     weightlbs: guess.weightLbs,
-    weightos: guess.weightOz,
+    weightoz: guess.weightOz,
     heightin: guess.heightIn,
   });
 
@@ -119,7 +118,7 @@ export async function getActualAnswers(): Promise<ActualAnswers | null> {
   return {
     birthDatetime: data.birthdatetime,
     weightLbs: data.weightlbs,
-    weightOz: data.weightos,
+    weightOz: data.weightoz,
     heightIn: data.heightin,
   };
 }
@@ -137,7 +136,7 @@ export async function setActualAnswers(answers: ActualAnswers): Promise<void> {
       id: 1,
       birthdatetime: answers.birthDatetime,
       weightlbs: answers.weightLbs,
-      weightos: answers.weightOz,
+      weightoz: answers.weightOz,
       heightin: answers.heightIn,
     },
     { onConflict: "id" }
