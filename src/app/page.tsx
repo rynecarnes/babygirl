@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PARTICIPANTS } from "@/config/participants";
 import { DateTimePicker } from "@/components/DateTimePicker";
+import { Guess } from "@/types";
 
 type Step = "identity" | "form";
 
@@ -45,11 +46,26 @@ function validate(data: FormData): FormErrors {
   return errors;
 }
 
+function formatDatetime(dt: string) {
+  if (!dt) return "—";
+  const date = new Date(dt);
+  if (isNaN(date.getTime())) return "—";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  let h = date.getHours();
+  const mins = String(date.getMinutes()).padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${m}/${d}/${y} ${h}:${mins} ${ampm}`;
+}
+
 export default function Home() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("identity");
   const [participant, setParticipant] = useState<string>("");
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [submittedGuess, setSubmittedGuess] = useState<Guess | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
 
@@ -67,26 +83,36 @@ export default function Home() {
     const saved = sessionStorage.getItem(SESSION_KEY);
     if (saved && PARTICIPANTS.includes(saved)) {
       setParticipant(saved);
-      // Check if already submitted
-      const submittedList: string[] = JSON.parse(
-        sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
-      );
-      if (submittedList.includes(saved)) {
-        setAlreadySubmitted(true);
-      } else {
-        // Verify with server
-        fetch("/api/guesses")
-          .then((r) => r.json())
-          .then((data) => {
-            const serverGuesses: { participant: string }[] = data.guesses ?? [];
-            if (serverGuesses.some((g) => g.participant === saved)) {
+      // Verify with server
+      fetch("/api/guesses")
+        .then((r) => r.json())
+        .then((data) => {
+          const serverGuesses: Guess[] = data.guesses ?? [];
+          const found = serverGuesses.find((g) => g.participant === saved);
+          if (found) {
+            setAlreadySubmitted(true);
+            setSubmittedGuess(found);
+          } else {
+            const submittedList: string[] = JSON.parse(
+              sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
+            );
+            if (submittedList.includes(saved)) {
               setAlreadySubmitted(true);
             } else {
               setStep("form");
             }
-          })
-          .catch(() => setStep("form"));
-      }
+          }
+        })
+        .catch(() => {
+          const submittedList: string[] = JSON.parse(
+            sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
+          );
+          if (submittedList.includes(saved)) {
+            setAlreadySubmitted(true);
+          } else {
+            setStep("form");
+          }
+        });
     }
   }, []);
 
@@ -98,9 +124,11 @@ export default function Home() {
     fetch("/api/guesses")
       .then((r) => r.json())
       .then((data) => {
-        const serverGuesses: { participant: string }[] = data.guesses ?? [];
-        if (serverGuesses.some((g) => g.participant === name)) {
+        const serverGuesses: Guess[] = data.guesses ?? [];
+        const found = serverGuesses.find((g) => g.participant === name);
+        if (found) {
           setAlreadySubmitted(true);
+          setSubmittedGuess(found);
         } else {
           setStep("form");
         }
@@ -237,11 +265,32 @@ export default function Home() {
                 once the baby arrives!
               </p>
             </div>
+
+            {submittedGuess && (
+              <div className="success-detail mt-md">
+                <div className="detail-row">
+                  <span className="detail-label">Date & Time of Birth</span>
+                  <span className="detail-value">{formatDatetime(submittedGuess.birthDatetime)}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Weight</span>
+                  <span className="detail-value">
+                    {submittedGuess.weightLbs} lbs {submittedGuess.weightOz} oz
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Height</span>
+                  <span className="detail-value">{submittedGuess.heightIn} in</span>
+                </div>
+              </div>
+            )}
+
             <button
               className="btn btn-ghost mt-md"
               onClick={() => {
                 setParticipant("");
                 setAlreadySubmitted(false);
+                setSubmittedGuess(null);
                 sessionStorage.removeItem(SESSION_KEY);
               }}
             >
