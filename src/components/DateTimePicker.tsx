@@ -182,8 +182,8 @@ export function DateTimePicker({ value, onChange, required }: DateTimePickerProp
                 onChange={(e) => handleTimeChange('minute', e.target.value)}
                 disabled={!selectedDate}
               >
-                {['00', '15', '30', '45'].map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                {Array.from({ length: 60 }).map((_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
                 ))}
               </select>
             </div>
