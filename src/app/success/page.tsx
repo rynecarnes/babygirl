@@ -65,9 +65,20 @@ function SuccessContent() {
             after the baby arrives!
           </p>
 
-          <Link href="/leaderboard" className="btn btn-primary mt-md">
-            View Leaderboard
-          </Link>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "1.5rem" }}>
+            <Link href="/leaderboard" className="btn btn-primary">
+              View Leaderboard
+            </Link>
+            <button 
+              className="btn btn-ghost"
+              onClick={() => {
+                sessionStorage.removeItem("babyguess_participant");
+                window.location.href = "/";
+              }}
+            >
+              Back to all participants
+            </button>
+          </div>
         </div>
       </div>
     </main>

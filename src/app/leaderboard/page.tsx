@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ScoredParticipant, ActualAnswers } from "@/types";
+import { ScoredParticipant, ActualAnswers, Guess } from "@/types";
 
 interface LeaderboardData {
   available: boolean;
@@ -36,6 +36,7 @@ export default function LeaderboardPage() {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [guesses, setGuesses] = useState<Guess[]>([]);
 
   useEffect(() => {
     fetch("/api/leaderboard")
@@ -43,6 +44,11 @@ export default function LeaderboardPage() {
       .then(setData)
       .catch(() => setError("Failed to load leaderboard. Please refresh."))
       .finally(() => setLoading(false));
+
+    fetch("/api/guesses")
+      .then((r) => r.json())
+      .then((d) => setGuesses(d.guesses ?? []))
+      .catch(() => {});
   }, []);
 
   if (loading) {
@@ -75,8 +81,8 @@ export default function LeaderboardPage() {
 
   if (!data?.available) {
     return (
-      <main className="page">
-        <div className="container">
+      <main className="page" style={{ paddingTop: "3rem", paddingBottom: "3rem" }}>
+        <div className="container container--wide">
           <div style={{ marginBottom: "1rem" }}>
             <a href="/" className="btn btn-ghost" style={{ padding: "0.5rem 0", color: "var(--accent)" }}>← Back to Home</a>
           </div>
@@ -89,6 +95,43 @@ export default function LeaderboardPage() {
                 been entered. Check back after the baby arrives!
               </p>
             </div>
+
+            {guesses.length > 0 && (
+              <>
+                <div className="divider" />
+                <p className="section-title" style={{ textAlign: "center", marginBottom: "1rem" }}>
+                  📋 Submitted Guesses ({guesses.length})
+                </p>
+                <div className="lb-table-wrapper">
+                  <table className="lb-table" aria-label="Submitted guesses">
+                    <thead>
+                      <tr>
+                        <th scope="col">Participant</th>
+                        <th scope="col">Date &amp; Time</th>
+                        <th scope="col">Weight</th>
+                        <th scope="col">Height</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {guesses.map((g) => (
+                        <tr key={g.participant}>
+                          <td style={{ fontWeight: 600 }}>{g.participant}</td>
+                          <td>{formatDatetime(g.birthDatetime)}</td>
+                          <td>{g.weightLbs} lbs {g.weightOz} oz</td>
+                          <td>{g.heightIn} in</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {guesses.length === 0 && (
+              <p className="text-muted text-sm text-center" style={{ marginTop: "1rem" }}>
+                No guesses have been submitted yet.
+              </p>
+            )}
           </div>
         </div>
       </main>

@@ -68,6 +68,7 @@ export default function Home() {
   const [submittedGuess, setSubmittedGuess] = useState<Guess | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [submittedParticipants, setSubmittedParticipants] = useState<string[]>([]);
 
   const [form, setForm] = useState<FormData>({
     birthDatetime: "",
@@ -78,42 +79,45 @@ export default function Home() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState(false);
 
-  // Restore session
+  // Restore session & fetch guesses
   useEffect(() => {
-    const saved = sessionStorage.getItem(SESSION_KEY);
-    if (saved && PARTICIPANTS.includes(saved)) {
-      setParticipant(saved);
-      // Verify with server
-      fetch("/api/guesses")
-        .then((r) => r.json())
-        .then((data) => {
-          const serverGuesses: Guess[] = data.guesses ?? [];
+    const submittedList: string[] = JSON.parse(
+      sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
+    );
+
+    fetch("/api/guesses")
+      .then((r) => r.json())
+      .then((data) => {
+        const serverGuesses: Guess[] = data.guesses ?? [];
+        const serverSubmitted = serverGuesses.map(g => g.participant);
+        setSubmittedParticipants(Array.from(new Set([...serverSubmitted, ...submittedList])));
+
+        const saved = sessionStorage.getItem(SESSION_KEY);
+        if (saved && PARTICIPANTS.includes(saved)) {
+          setParticipant(saved);
           const found = serverGuesses.find((g) => g.participant === saved);
           if (found) {
             setAlreadySubmitted(true);
             setSubmittedGuess(found);
+          } else if (submittedList.includes(saved)) {
+            setAlreadySubmitted(true);
           } else {
-            const submittedList: string[] = JSON.parse(
-              sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
-            );
-            if (submittedList.includes(saved)) {
-              setAlreadySubmitted(true);
-            } else {
-              setStep("form");
-            }
+            setStep("form");
           }
-        })
-        .catch(() => {
-          const submittedList: string[] = JSON.parse(
-            sessionStorage.getItem(SUBMITTED_KEY) ?? "[]"
-          );
+        }
+      })
+      .catch(() => {
+        setSubmittedParticipants(submittedList);
+        const saved = sessionStorage.getItem(SESSION_KEY);
+        if (saved && PARTICIPANTS.includes(saved)) {
+          setParticipant(saved);
           if (submittedList.includes(saved)) {
             setAlreadySubmitted(true);
           } else {
             setStep("form");
           }
-        });
-    }
+        }
+      });
   }, []);
 
   function selectParticipant(name: string) {
@@ -125,6 +129,10 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => {
         const serverGuesses: Guess[] = data.guesses ?? [];
+        const serverSubmitted = serverGuesses.map(g => g.participant);
+        const submittedList: string[] = JSON.parse(sessionStorage.getItem(SUBMITTED_KEY) ?? "[]");
+        setSubmittedParticipants(Array.from(new Set([...serverSubmitted, ...submittedList])));
+        
         const found = serverGuesses.find((g) => g.participant === name);
         if (found) {
           setAlreadySubmitted(true);
@@ -213,16 +221,19 @@ export default function Home() {
             <div className="divider" />
 
             <div className="participants-grid">
-              {PARTICIPANTS.map((name) => (
-                <button
-                  key={name}
-                  id={`participant-${name.toLowerCase().replace(/\s+/g, "-")}`}
-                  className="participant-btn"
-                  onClick={() => selectParticipant(name)}
-                >
-                  {name}
-                </button>
-              ))}
+              {PARTICIPANTS.map((name) => {
+                const isSubmitted = submittedParticipants.includes(name);
+                return (
+                  <button
+                    key={name}
+                    id={`participant-${name.toLowerCase().replace(/\s+/g, "-")}`}
+                    className={`participant-btn ${isSubmitted ? 'submitted' : ''}`}
+                    onClick={() => selectParticipant(name)}
+                  >
+                    {name} {isSubmitted && "✅"}
+                  </button>
+                );
+              })}
             </div>
 
             <div style={{ textAlign: "center", marginTop: "1.5rem" }}>
