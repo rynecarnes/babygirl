@@ -99,6 +99,22 @@ export async function hasGuess(participant: string): Promise<boolean> {
   return data !== null;
 }
 
+export async function deleteGuess(participant: string): Promise<void> {
+  if (useLocalFs) {
+    const db = await readLocalDb();
+    db.guesses = db.guesses.filter((g) => g.participant !== participant);
+    await writeLocalDb(db);
+    return;
+  }
+
+  const { error } = await supabase!
+    .from("guesses")
+    .delete()
+    .eq("participant", participant);
+
+  if (error) throw new Error(error.message);
+}
+
 // ─── Actual Answers ────────────────────────────────────────
 export async function getActualAnswers(): Promise<ActualAnswers | null> {
   if (useLocalFs) {

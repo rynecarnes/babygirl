@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Guess } from "@/types";
+
 interface FormData {
   password: string;
   birthDatetime: string;
@@ -43,6 +45,54 @@ export default function AdminPage() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  // Guess management state
+  const [guesses, setGuesses] = useState<Guess[]>([]);
+  const [guessesLoading, setGuessesLoading] = useState(true);
+  const [deletingParticipant, setDeletingParticipant] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteSuccess, setDeleteSuccess] = useState("");
+
+  useEffect(() => {
+    fetch("/api/guesses")
+      .then((r) => r.json())
+      .then((d) => setGuesses(d.guesses ?? []))
+      .catch(() => {})
+      .finally(() => setGuessesLoading(false));
+  }, []);
+
+  async function handleDelete(participant: string) {
+    if (!form.password) {
+      setDeleteError("Enter your admin password above first.");
+      return;
+    }
+    setDeletingParticipant(participant);
+    setDeleteError("");
+    setDeleteSuccess("");
+    try {
+      const res = await fetch("/api/guesses", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: form.password, participant }),
+      });
+      if (res.status === 401) {
+        setDeleteError("Incorrect password.");
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json();
+        setDeleteError(data.error ?? "Failed to delete guess.");
+        return;
+      }
+      setGuesses((prev) => prev.filter((g) => g.participant !== participant));
+      setDeleteSuccess(`${participant}'s guess has been deleted. They can now resubmit.`);
+    } catch {
+      setDeleteError("Network error. Please try again.");
+    } finally {
+      setDeletingParticipant(null);
+    }
+  }
+
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -267,6 +317,103 @@ export default function AdminPage() {
               )}
             </button>
           </form>
+        </div>
+
+        {/* Manage Guesses Section */}
+        <div className="card" style={{ marginTop: "1.5rem" }}>
+          <div className="logo">
+            <span className="logo-emoji">🗑️</span>
+          </div>
+          <h2 className="page-title" style={{ fontSize: "1.5rem" }}>Manage Guesses</h2>
+          <p className="page-subtitle">
+            Delete a participant's guess so they can go back and resubmit.
+          </p>
+
+          <div className="divider" />
+
+          {deleteError && (
+            <div className="error-banner" role="alert" style={{ marginBottom: "1rem" }}>
+              ⚠️ {deleteError}
+            </div>
+          )}
+          {deleteSuccess && (
+            <div className="admin-success" style={{ marginBottom: "1rem" }}>
+              ✅ {deleteSuccess}
+            </div>
+          )}
+
+          {guessesLoading ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem" }}>
+              <span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} />
+            </div>
+          ) : guesses.length === 0 ? (
+            <p className="text-muted text-sm text-center">No guesses submitted yet.</p>
+          ) : (
+            <div className="lb-table-wrapper">
+              <table className="lb-table" aria-label="Manage participant guesses">
+                <thead>
+                  <tr>
+                    <th scope="col">Participant</th>
+                    <th scope="col">Date &amp; Time</th>
+                    <th scope="col">Weight</th>
+                    <th scope="col">Height</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guesses.map((g) => (
+                    <tr key={g.participant}>
+                      <td style={{ fontWeight: 600 }}>{g.participant}</td>
+                      <td style={{ fontSize: "0.85rem" }}>
+                        {g.birthDatetime
+                          ? new Date(g.birthDatetime).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td style={{ fontSize: "0.85rem" }}>
+                        {g.weightLbs} lbs {g.weightOz} oz
+                      </td>
+                      <td style={{ fontSize: "0.85rem" }}>{g.heightIn} in</td>
+                      <td>
+                        <button
+                          id={`delete-${g.participant.toLowerCase().replace(/\s+/g, "-")}`}
+                          className="btn"
+                          disabled={deletingParticipant === g.participant}
+                          onClick={() => handleDelete(g.participant)}
+                          style={{
+                            background: "rgba(239,68,68,0.15)",
+                            color: "#f87171",
+                            border: "1px solid rgba(239,68,68,0.3)",
+                            padding: "0.35rem 0.75rem",
+                            fontSize: "0.8rem",
+                            borderRadius: "var(--radius-sm)",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.35rem",
+                            transition: "background 0.2s",
+                          }}
+                          onMouseOver={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background =
+                              "rgba(239,68,68,0.28)")
+                          }
+                          onMouseOut={(e) =>
+                            ((e.currentTarget as HTMLButtonElement).style.background =
+                              "rgba(239,68,68,0.15)")
+                          }
+                        >
+                          {deletingParticipant === g.participant ? (
+                            <><span className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Deleting…</>
+                          ) : (
+                            <>🗑️ Delete</>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </main>

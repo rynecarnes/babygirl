@@ -1,6 +1,6 @@
 // src/app/api/guesses/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getGuesses, appendGuess, hasGuess, getActualAnswers } from "@/lib/db";
+import { getGuesses, appendGuess, hasGuess, getActualAnswers, deleteGuess } from "@/lib/db";
 import { PARTICIPANTS } from "@/config/participants";
 import { Guess } from "@/types";
 
@@ -62,5 +62,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Failed to submit guess" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { password, participant } = body;
+
+    // Admin auth
+    if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Validate participant
+    if (!participant || !PARTICIPANTS.includes(participant)) {
+      return NextResponse.json({ error: "Invalid participant" }, { status: 400 });
+    }
+
+    // Check the guess exists
+    const exists = await hasGuess(participant);
+    if (!exists) {
+      return NextResponse.json({ error: "No guess found for this participant" }, { status: 404 });
+    }
+
+    await deleteGuess(participant);
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Failed to delete guess" }, { status: 500 });
   }
 }
